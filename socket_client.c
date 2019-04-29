@@ -1,63 +1,48 @@
-#include <stdio.h> 
-#include <stdlib.h> 
-#include <errno.h> 
-#include <string.h> 
-#include <netdb.h> 
-#include <sys/types.h> 
-#include <netinet/in.h> 
-#include <sys/socket.h> 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
-#define PORT 3490    /* the port client will be connecting to */
-#define MAXDATASIZE 100 /* max number of bytes we can get at once */
 
-int main(int argc, char *argv[])
+int main(int argc , char *argv[])
 {
-  int sockfd, numbytes;  
-  char buf[MAXDATASIZE];
-  struct hostent *he;
-  struct sockaddr_in their_addr; /* connector's address information */
 
-  if (argc != 2) {
-    fprintf(stderr,"usage: client hostname\n");
-    exit(1);
-  }
+    //socket creating
+    int sockfd = 0;
+    sockfd = socket(AF_INET , SOCK_STREAM , 0);
 
-  if ((he=gethostbyname(argv[1])) == NULL) {  /* get the host info */
-    herror("gethostbyname");
-    exit(1);
-  }
-
-  if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-    perror("socket");
-    exit(1);
-  }
-
-  their_addr.sin_family = AF_INET;      /* host byte order */
-  their_addr.sin_port = htons(PORT);    /* short, network byte order */
-  their_addr.sin_addr = *((struct in_addr *)he->h_addr);
-  bzero(&(their_addr.sin_zero), 8);     /* zero the rest of the struct */
-
-  if (connect(sockfd, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) {
-    perror("connect");
-    exit(1);
-  }
-  while (1) {
-    if (send(sockfd, "Hello, world!\n", 14, 0) == -1){
-      perror("send");
-      exit (1);
+    if (sockfd == -1){
+        printf("Fail to create a socket.");
     }
-    printf("After the send function \n");
 
-    if ((numbytes=recv(sockfd, buf, MAXDATASIZE, 0)) == -1) {
-      perror("recv");
-      exit(1);
-    }	
+    //socket connecting
 
-    buf[numbytes] = '\0';
-    printf("Received in pid=%d, text=: %s \n",getpid(), buf);
-    sleep(1);
-   }
-  close(sockfd);
-  return 0;
+    struct sockaddr_in info;
+    bzero(&info,sizeof(info));
+    info.sin_family = PF_INET;
+
+    //localhost test
+    info.sin_addr.s_addr = inet_addr("127.0.0.1");
+    info.sin_port = htons(8700);
+
+
+    int err = connect(sockfd,(struct sockaddr *)&info,sizeof(info));
+    if(err==-1){
+        printf("Connection error");
+    }
+
+
+    //Send a message to server
+    char message[] = {"Hi there"};
+    char receiveMessage[100] = {};
+    send(sockfd,message,sizeof(message),0);
+    recv(sockfd,receiveMessage,sizeof(receiveMessage),0);
+
+    printf("%s",receiveMessage);
+    printf("close Socket\n");
+    close(sockfd);
+    return 0;
 }

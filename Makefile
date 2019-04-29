@@ -1,8 +1,8 @@
-multithread_server:multithread_server.c
-	gcc -o multithread_server multithread_server.c
-
-socket_client:socket_client.c
-	gcc -o socket_client socket_client.c
+client:multicast_client.c
+	gcc –o client multicast_client.c 
+	
+server:multicast_server.c
+	gcc –o server multicast_server.c 
 
 clean:
-	rm -f socket_client multithread_server
+	rm -f client server

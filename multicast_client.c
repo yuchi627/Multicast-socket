@@ -1,19 +1,27 @@
 /* Receiver/client multicast Datagram example. */
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
- 
+#include <unistd.h>
+#include <string.h>
+
+#define datalen 1023
+#define end_len 12
+#define file_name_len 100
+#define package_num_len 15
+
 struct sockaddr_in localSock;
 struct ip_mreq group;
 int sd;
-int datalen;
-char databuf[1024];
- 
+
+
 int main(int argc, char *argv[])
 {
+  char end_signal[end_len] = "endOFtheFILE";
   /* Create a datagram socket on which to receive. */
   sd = socket(AF_INET, SOCK_DGRAM, 0);
   if(sd < 0)
@@ -29,13 +37,13 @@ int main(int argc, char *argv[])
   {
     int reuse = 1;
     if(setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse, sizeof(reuse)) < 0)
-  {
-    perror("Setting SO_REUSEADDR error");
-    close(sd);
-    exit(1);
-  }
-  else
-    printf("Setting SO_REUSEADDR...OK.\n");
+    {
+      perror("Setting SO_REUSEADDR error");
+      close(sd);
+      exit(1);
+    }
+    else
+      printf("Setting SO_REUSEADDR...OK.\n");
   }
  
   /* Bind to the proper port number with the IP address */
@@ -58,7 +66,7 @@ int main(int argc, char *argv[])
   /* called for each local interface over which the multicast */
   /* datagrams are to be received. */
   group.imr_multiaddr.s_addr = inet_addr("226.1.1.1");
-  group.imr_interface.s_addr = inet_addr("203.106.93.94");
+  group.imr_interface.s_addr = inet_addr("127.0.0.1");
   if(setsockopt(sd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&group, sizeof(group)) < 0)
   {
     perror("Adding multicast group error");
@@ -67,19 +75,59 @@ int main(int argc, char *argv[])
   }
   else
     printf("Adding multicast group...OK.\n");
- 
+
+  /*create the recv dir*/
+  struct stat st = {0};
+  if(stat("recv", &st) == -1)
+    mkdir("recv", 0755);
+
+  /*get the file name from server*/
+  char file[file_name_len];
+  memset(file,'\0',file_name_len);
+  char file_name[file_name_len];
+  memset(file_name,'\0',file_name_len);
+  if(read(sd, file_name, sizeof(file_name)) < 0)
+    printf("read file name fail!\n");
+  strcat(file,"recv/");
+  strcat(file,file_name);
+  FILE *f;
+  f = fopen(file,"wb");
+  if(f == NULL)
+    perror("fopen fail");
+  
   /* Read from the socket. */
-  datalen = sizeof(databuf);
-  if(read(sd, databuf, datalen) < 0)
-  {
-    perror("Reading datagram message error");
-    close(sd);
-    exit(1);
+  int numbyte;
+  char package[package_num_len+1];
+  char databuf[datalen];
+  char msg[datalen+package_num_len];
+  while(1){
+    memset(msg,'\0',datalen+package_num_len);
+    numbyte = read(sd, msg, sizeof(msg));
+    printf("````````%d``````````\n",numbyte);
+    if(strncmp(msg,end_signal,end_len) == 0)
+      break;
+    else if(numbyte < 0)
+    {
+      perror("Reading datagram message error");
+      break;
+    }
+    else
+    {
+      memset(databuf,'\0',datalen);
+      memset(package,'\0',package_num_len);
+      printf("The message from multicast server is: %s\n", msg);
+      memcpy(package, msg, package_num_len*sizeof(char));
+      memcpy(databuf, msg + package_num_len, (numbyte-package_num_len)*sizeof(char));
+      fwrite(&databuf, sizeof(char), numbyte-package_num_len, f);
+      //printf("the char cut : %s ",package);
+    }
   }
-  else
-  {
-    printf("Reading datagram message...OK.\n");
-    printf("The message from multicast server is: \"%s\"\n", databuf);
-  }
+  /* total package number */
+  read(sd, msg, sizeof(msg));
+
+  close(sd);
+
   return 0;
 }
+
+//gcc multicast_client.c -o client

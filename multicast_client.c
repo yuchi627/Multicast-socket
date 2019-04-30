@@ -8,11 +8,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <liquid/liquid.h>
 
 #define datalen 1023
 #define end_len 12
 #define file_name_len 100
 #define package_num_len 15
+#define encode_len 2000
 
 struct sockaddr_in localSock;
 struct ip_mreq group;
@@ -29,8 +31,6 @@ int main(int argc, char *argv[])
     perror("Opening datagram socket error");
     exit(1);
   }
-  else
-    printf("Opening datagram socket....OK.\n");
  
   /* Enable SO_REUSEADDR to allow multiple instances of this */
   /* application to receive copies of the multicast datagrams. */
@@ -42,8 +42,6 @@ int main(int argc, char *argv[])
       close(sd);
       exit(1);
     }
-    else
-      printf("Setting SO_REUSEADDR...OK.\n");
   }
  
   /* Bind to the proper port number with the IP address */
@@ -58,8 +56,6 @@ int main(int argc, char *argv[])
     close(sd);
     exit(1);
   }
-  else
-    printf("Binding datagram socket...OK.\n");
  
   /* Join the multicast group 226.1.1.1 on the local 203.106.93.94 */
   /* interface. Note that this IP_ADD_MEMBERSHIP option must be */
@@ -73,8 +69,6 @@ int main(int argc, char *argv[])
     close(sd);
     exit(1);
   }
-  else
-    printf("Adding multicast group...OK.\n");
 
   /*create the recv dir*/
   struct stat st = {0};
@@ -97,14 +91,18 @@ int main(int argc, char *argv[])
   
   /* Read from the socket. */
   int numbyte;
-  char package[package_num_len+1];
-  char databuf[datalen];
-  char msg[datalen+package_num_len];
+  int package_count=0 ;
+  unsigned char package[package_num_len+1];
+  unsigned char databuf[datalen];
+  unsigned char encode_msg[encode_len];
+  unsigned char msg[datalen+package_num_len];
+  fec_scheme fs = LIQUID_FEC_HAMMING74;   // error-correcting scheme
   while(1){
     memset(msg,'\0',datalen+package_num_len);
-    numbyte = read(sd, msg, sizeof(msg));
-    printf("````````%d``````````\n",numbyte);
-    if(strncmp(msg,end_signal,end_len) == 0)
+    numbyte = read(sd, encode_msg, sizeof(encode_msg));
+    //printf("numbyte = %d\n",numbyte);
+    //numbyte = read(sd, msg, sizeof(msg));
+    if(strncmp(encode_msg,end_signal,end_len) == 0)
       break;
     else if(numbyte < 0)
     {
@@ -113,21 +111,29 @@ int main(int argc, char *argv[])
     }
     else
     {
+      ++package_count;
+      unsigned int n = datalen + package_num_len + 1;
+      fec q = fec_create(fs,NULL);
+      fec_decode(q, n, encode_msg, msg);
       memset(databuf,'\0',datalen);
       memset(package,'\0',package_num_len);
-      printf("The message from multicast server is: %s\n", msg);
-      memcpy(package, msg, package_num_len*sizeof(char));
-      memcpy(databuf, msg + package_num_len, (numbyte-package_num_len)*sizeof(char));
-      fwrite(&databuf, sizeof(char), numbyte-package_num_len, f);
-      //printf("the char cut : %s ",package);
+      numbyte = strlen(msg);
+      memcpy(package, msg, package_num_len*sizeof(unsigned char));
+      memcpy(databuf, msg + package_num_len, (numbyte-package_num_len)*sizeof(unsigned char));
+      fwrite(&databuf, sizeof(unsigned char), numbyte-package_num_len, f);
+      //printf("The message from multicast server is: %s\n", databuf);
+      fec_destroy(q);
     }
   }
   /* total package number */
   read(sd, msg, sizeof(msg));
-
+  int total = atoi(msg);
+  //printf("total = %d\n",total);
   close(sd);
+  double package_loss_rate = (total-package_count) / total;
+  printf("package loss rate = %lf", package_loss_rate);
 
   return 0;
 }
 
-//gcc multicast_client.c -o client
+//gcc multicast_client.c -o client -lliquid

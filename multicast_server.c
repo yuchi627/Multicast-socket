@@ -33,8 +33,6 @@ int main (int argc, char *argv[ ])
     perror("Opening datagram socket error");
     exit(1);
   }
-  else
-    printf("Opening the datagram socket...OK.\n");
  
   /* Initialize the group sockaddr structure with a */
   /* group address of 225.1.1.1 and port 5555. */
@@ -66,8 +64,6 @@ int main (int argc, char *argv[ ])
     perror("Setting local interface error");
     exit(1);
   }
-  else
-    printf("Setting the local interface...OK\n");
   /* Send a message to the multicast group specified by the*/
   /* groupSock sockaddr structure. */
   /*int datalen = 1024;*/
@@ -84,6 +80,7 @@ int main (int argc, char *argv[ ])
   unsigned char package[package_num_len];
   unsigned char databuf[datalen];
   unsigned char msg[datalen + package_num_len + 1];
+  //unsigned char msg_enc[datalen + package_num_len + 1];       // encoded/received data message
   while(!feof(f)){
     
     ++package_num;
@@ -93,34 +90,50 @@ int main (int argc, char *argv[ ])
     
     numbyte = fread(databuf, sizeof(unsigned char), sizeof(databuf), f);
     memset(msg,'\0',datalen + package_num_len + 1);
-    strncat(msg, package, sizeof(package));
+    //printf("\n\nsize of package = %ld\n\n",strlen(package));
+    strncat(msg, package, strlen(package));
+    fec_scheme fs = LIQUID_FEC_HAMMING74;   // error-correcting scheme
     while(strlen(msg) != package_num_len)
       strncat(msg, "-",sizeof(unsigned char));
-    strncat(msg, databuf,sizeof(databuf));
+    strncat(msg, databuf, numbyte);
+
     /*encode*/
     // simulation parameters
-    unsigned int n = sizeof(msg); // original data length (bytes)
-    // compute size of encoded message
-    unsigned int k = n;             // (no encoding yet)
+    //unsigned int n = sizeof(msg); // original data length (bytes)
 
-    // create arrays
-    unsigned char msg_org[n];       // original data message
-    unsigned char msg_enc[k];       // encoded/received data message
+    //unsigned int n = 8;       
+
+
+
+    unsigned int n = datalen + package_num_len + 1;
+    // compute size of encoded message
+    unsigned int k = fec_get_enc_msg_length(fs,n);
+    //unsigned char msg_org[n];   // original data message
+    unsigned char msg_enc[k];   // encoded/received data message
+    memset(msg_enc,'\0',datalen + package_num_len + 1);
+    // CREATE the fec object
+    fec q = fec_create(fs,NULL);
+    //fec_print(q);
     unsigned int i;
-    // "encode" message (copy to msg_enc)
-    for (i=0; i<n; i++) msg_enc[i] = msg[i];
+    // encode message
+    fec_encode(q, n, msg, msg_enc);
     // corrupt encoded message (flip bit)
     msg_enc[0] ^= 0x01;
+    // DESTROY the fec object
+    fec_destroy(q);
 
-    if(sendto(sd, msg, numbyte + package_num_len, 0, (struct sockaddr*)&groupSock, sizeof(groupSock)) < 0)
+
+    //if(sendto(sd, msg, numbyte + package_num_len, 0, (struct sockaddr*)&groupSock, sizeof(groupSock)) < 0)
+    if(sendto(sd, msg_enc, sizeof(msg_enc), 0, (struct sockaddr*)&groupSock, sizeof(groupSock)) < 0)
     {
       perror("Sending datagram message error");
     }
     else{
-      printf("`````%d``````\n",numbyte + package_num_len);
-      printf("Sendinf msg: %s OK\n",msg);
+      //printf("`````%d``````\n",numbyte + package_num_len);
+      //printf("Sendinf msg: %s OK\n",msg);
     }
   }
+  //printf("what the fuck\n");
   /* Try the re-read from the socket if the loopback is not disable
   if(read(sd, databuf, datalen) < 0)
   {
@@ -149,4 +162,4 @@ int main (int argc, char *argv[ ])
   return 0;
 }
 
-//gcc multicast_server.c -o sever
+//gcc -o server multicast_server.c -lliquid

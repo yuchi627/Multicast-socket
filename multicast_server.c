@@ -19,7 +19,6 @@ struct in_addr localInterface;
 struct sockaddr_in groupSock;
 int sd;
 
-
 int main (int argc, char *argv[ ])
 {
   char end_signal[end_len] = "endOFtheFILE";
@@ -84,7 +83,27 @@ int main (int argc, char *argv[ ])
   unsigned char databuf[datalen+1];
   unsigned char msg[datalen + package_num_len + package_num_len + 1];
   unsigned char len[package_num_len+1];
+  unsigned char encode_len[package_num_len+1];
+  unsigned char encode_len2[package_num_len+1];
   fec_scheme fs = LIQUID_FEC_HAMMING74;   // error-correcting scheme
+  // compute size of encoded message
+  unsigned int n = sizeof(msg);
+  unsigned int k = fec_get_enc_msg_length(fs,n);
+  memset(encode_len,'\0',sizeof(encode_len));
+  sprintf(encode_len,"%u",k);
+  printf("k= %u      en = %s",k,encode_len);
+  if(sendto(sd, encode_len, sizeof(encode_len), 0, (struct sockaddr*)&groupSock, sizeof(groupSock)) < 0)
+  {
+    perror("Sending datagram message error");
+  }
+
+  memset(encode_len2,'\0',sizeof(encode_len2));
+  sprintf(encode_len2,"%u",n);
+  printf("n= %u      en = %s",n,encode_len2);
+  if(sendto(sd, encode_len2, sizeof(encode_len2), 0, (struct sockaddr*)&groupSock, sizeof(groupSock)) < 0)
+  {
+    perror("Sending datagram message error");
+  }
   while(!feof(f)){
     
     ++package_num;
@@ -95,7 +114,6 @@ int main (int argc, char *argv[ ])
     numbyte = fread(databuf, sizeof(char), sizeof(databuf), f);
     //printf("databuf = %s\n",databuf);
     memset(msg,'\0',sizeof(msg));
-    
     while(strlen(package) != package_num_len)
       strncat(package, "-",sizeof(unsigned char));
     strncat(msg, package, strlen(package));
@@ -106,22 +124,14 @@ int main (int argc, char *argv[ ])
     }
     strncat(msg, len, strlen(len));
     strncat(msg, databuf, numbyte);
-    /*encode*/
-    // simulation parameters   
-    unsigned int n = sizeof(msg);
-    // compute size of encoded message
-    unsigned int k = fec_get_enc_msg_length(fs,n);
-    //unsigned char msg_org[n];   // original data message
+    /*encode*/    
     unsigned char msg_enc[k];   // encoded/received data message
     memset(msg_enc,'\0',sizeof(msg_enc));
     // CREATE the fec object
     fec q = fec_create(fs,NULL);
-    //fec_print(q);
     unsigned int i;
     // encode message
     fec_encode(q, n, msg, msg_enc);
-    // corrupt encoded message (flip bit)
-    msg_enc[0] ^= 0x01;
 
     // DESTROY the fec object
     fec_destroy(q);

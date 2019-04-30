@@ -95,15 +95,27 @@ int main(int argc, char *argv[])
     perror("fopen fail");
   
   /* Read from the socket. */
+  char decode_len[package_num_len];
+  memset(decode_len,'\0',sizeof(decode_len));
+  read(sd, decode_len, sizeof(decode_len));
+  int decode_len_num = atoi(decode_len);
+  printf("decode = %s, len = %d\n",decode_len, decode_len_num);
+  char decode_len2[package_num_len];
+  memset(decode_len2,'\0',sizeof(decode_len2));
+  read(sd, decode_len2, sizeof(decode_len2));
+  int decode_len_num2 = atoi(decode_len2);
+  printf("decode2 = %s, len2 = %d\n",decode_len2, decode_len_num2);
+
   int numbyte;
   int package_count=0 ;
   unsigned char package[package_num_len+1];
   unsigned char databuf[datalen+1];
-  unsigned char encode_msg[encode_len+1];
+  unsigned char encode_msg[decode_len_num];
   unsigned char msg[datalen + package_num_len + package_num_len+1];
   unsigned char len[package_num_len+1];
   char real_len[package_num_len+1];
   fec_scheme fs = LIQUID_FEC_HAMMING74;   // error-correcting scheme
+  
   while(1){
     memset(msg,'\0',sizeof(msg));
     numbyte = read(sd, encode_msg, sizeof(encode_msg));
@@ -117,9 +129,9 @@ int main(int argc, char *argv[])
     else
     {
       ++package_count;
-      unsigned int n = datalen + package_num_len + package_num_len + 1;
+      //unsigned int n = sizeof(msg);
       fec q = fec_create(fs,NULL);
-      fec_decode(q, n, encode_msg, msg);
+      fec_decode(q, decode_len_num2, encode_msg, msg);
       memset(databuf,'\0',sizeof(databuf));
       memset(package,'\0',sizeof(package));
       memset(len,'\0',sizeof(len));
@@ -133,7 +145,7 @@ int main(int argc, char *argv[])
       int k=0;
       int count=0;
       memset(real_len,'\0',sizeof(real_len));
-      for(k=0;k<package_num_len;++k){
+      for(k=0; k < package_num_len; ++k){
         if(len[k]=='-')
           break;
       }

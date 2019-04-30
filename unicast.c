@@ -83,10 +83,10 @@ int tcp_client(char* ip, int port){
             log_data = ((double)sum/file_size)*100;
             //get the time
             timeinfo = localtime(&raw_time);
-            if((log_data/5)*5 != last_data_log){
+            /*if((log_data/5)*5 != last_data_log){
                 for(int log_num = last_data_log+5; log_num <= (log_data/5)*5; log_num += 5)
                     //printf("%d%c %d/%d/%d %d:%d:%d\n",log_num,'%',timeinfo->tm_year+1900,timeinfo->tm_mon,timeinfo->tm_mday,timeinfo->tm_hour,timeinfo->tm_min,timeinfo->tm_sec);
-            }
+            }*/
             if(numbytes <= 0){
                 break;
             }
@@ -259,10 +259,10 @@ int udp_client(char* ip, int port){
             }
             log_data = ((float)sum/file_size)*100;
             timeinfo = localtime(&raw_time);
-            if((log_data/5)*5 != last_data_log){
+            /*if((log_data/5)*5 != last_data_log){
                 for(int log_num = last_data_log+5; log_num <= (log_data/5)*5; log_num += 5)
                     //printf("%d%c %d/%d/%d %d:%d:%d\n",log_num,'%',timeinfo->tm_year+1900,timeinfo->tm_mon,timeinfo->tm_mday,timeinfo->tm_hour,timeinfo->tm_min,timeinfo->tm_sec);
-            }
+            }*/
             numbytes = fwrite(&buf, sizeof(char), numbytes, fp);
             last_data_log = (log_data/5)*5;
         }

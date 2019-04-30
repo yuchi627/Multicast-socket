@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
       memcpy(real_len, len, k*sizeof(unsigned char));
       int real_size = atoi(real_len);
       
-      fwrite(databuf, sizeof(char), real_size, f);
+      fwrite(&databuf, sizeof(char), real_size, f);
 
       //printf("databuf = %s\n",databuf);
 

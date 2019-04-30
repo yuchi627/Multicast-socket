@@ -10,7 +10,7 @@
 #include <string.h>
 #include <liquid/liquid.h>
 
-#define datalen 1023
+#define datalen 1024
 #define end_len 12
 #define file_name_len 100
 #define package_num_len 15
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 {
   char end_signal[end_len] = "endOFtheFILE";
   char ip[ip_len];
-  memset(ip,'\0',ip_len);
+  memset(ip,'\0',sizeof(ip));
   strncat(ip,argv[1],strlen(argv[1]));
 
   /* Create a datagram socket on which to receive. */
@@ -82,9 +82,9 @@ int main(int argc, char *argv[])
 
   /*get the file name from server*/
   char file[file_name_len];
-  memset(file,'\0',file_name_len);
+  memset(file,'\0',sizeof(file));
   char file_name[file_name_len];
-  memset(file_name,'\0',file_name_len);
+  memset(file_name,'\0',sizeof(file_name));
   if(read(sd, file_name, sizeof(file_name)) < 0)
     printf("read file name fail!\n");
   strcat(file,"recv/");
@@ -98,14 +98,14 @@ int main(int argc, char *argv[])
   int numbyte;
   int package_count=0 ;
   unsigned char package[package_num_len+1];
-  unsigned char databuf[datalen];
-  unsigned char encode_msg[encode_len];
-  unsigned char msg[datalen+package_num_len + package_num_len];
+  unsigned char databuf[datalen+1];
+  unsigned char encode_msg[encode_len+1];
+  unsigned char msg[datalen + package_num_len + package_num_len+1];
   unsigned char len[package_num_len+1];
-  char real_len[package_num_len];
+  char real_len[package_num_len+1];
   fec_scheme fs = LIQUID_FEC_HAMMING74;   // error-correcting scheme
   while(1){
-    memset(msg,'\0',datalen+package_num_len + package_num_len);
+    memset(msg,'\0',sizeof(msg));
     numbyte = read(sd, encode_msg, sizeof(encode_msg));
     if(strncmp(encode_msg,end_signal,end_len) == 0)
       break;
@@ -120,25 +120,30 @@ int main(int argc, char *argv[])
       unsigned int n = datalen + package_num_len + package_num_len + 1;
       fec q = fec_create(fs,NULL);
       fec_decode(q, n, encode_msg, msg);
-      memset(databuf,'\0',datalen);
-      memset(package,'\0',package_num_len);
-      memset(len,'\0',package_num_len);
+      memset(databuf,'\0',sizeof(databuf));
+      memset(package,'\0',sizeof(package));
+      memset(len,'\0',sizeof(len));
 
-      numbyte = sizeof(msg);
       memcpy(package, msg, package_num_len*sizeof(unsigned char));
       memcpy(len, msg + package_num_len, package_num_len*sizeof(unsigned char));
-      printf("len = %s\n",len);
+      numbyte = sizeof(msg);
+      memcpy(databuf, msg + package_num_len + package_num_len, (numbyte - package_num_len - package_num_len)*sizeof(unsigned char));
+
+      /*the size write into file*/
       int k=0;
       int count=0;
-      memset(real_len,'\0',package_num_len);
+      memset(real_len,'\0',sizeof(real_len));
       for(k=0;k<package_num_len;++k){
         if(len[k]=='-')
           break;
       }
       memcpy(real_len, len, k*sizeof(unsigned char));
       int real_size = atoi(real_len);
-      memcpy(databuf, msg + package_num_len + package_num_len, (numbyte-package_num_len-+ package_num_len)*sizeof(unsigned char));
-      fwrite(databuf, sizeof(unsigned char), real_size, f);
+      
+      fwrite(databuf, sizeof(char), real_size, f);
+
+      //printf("databuf = %s\n",databuf);
+
       fec_destroy(q);
     }
   }
@@ -146,7 +151,6 @@ int main(int argc, char *argv[])
   read(sd, msg, sizeof(msg));
   int total = atoi(msg);
   close(sd);
-  printf("package_count=%d  total = %d\n",package_count,total);
   double package_loss_rate = (double)(total-package_count) / total;
   printf("package loss rate = %lf\n", package_loss_rate);
 

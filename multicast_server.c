@@ -25,9 +25,9 @@ int main (int argc, char *argv[ ])
   char end_signal[end_len] = "endOFtheFILE";
   char file[file_name_len];
   char ip[ip_len];
-  memset(ip,'\0',ip_len);
+  memset(ip,'\0',sizeof(ip));
   strncat(ip,argv[1],strlen(argv[1]));
-  memset(file,'\0',file_name_len);
+  memset(file,'\0',sizeof(file));
   strcat(file,argv[2]);
 
   /* Create a datagram socket on which to send. */
@@ -80,41 +80,40 @@ int main (int argc, char *argv[ ])
   sendto(sd, file, file_name_len, 0, (struct sockaddr*)&groupSock, sizeof(groupSock));
   int numbyte;
   int package_num = 0;
-  unsigned char package[package_num_len];
-  unsigned char databuf[datalen];
+  unsigned char package[package_num_len+1];
+  unsigned char databuf[datalen+1];
   unsigned char msg[datalen + package_num_len + package_num_len + 1];
-  unsigned char len[package_num_len];
+  unsigned char len[package_num_len+1];
   fec_scheme fs = LIQUID_FEC_HAMMING74;   // error-correcting scheme
   while(!feof(f)){
     
     ++package_num;
-    memset(package,'\0',package_num_len);
+    memset(package,'\0',sizeof(package));
     sprintf(package,"%d",package_num);
-    memset(databuf,'\0',datalen);
-    numbyte = fread(databuf, sizeof(unsigned char), sizeof(databuf), f);
-    
-    memset(msg,'\0',datalen + package_num_len + package_num_len + 1);
+    memset(databuf,'\0',sizeof(databuf));
+    //printf("databuf sizeof= %ld  strlen = %ld\n%s\n",sizeof(databuf),strlen(databuf),databuf);
+    numbyte = fread(databuf, sizeof(char), sizeof(databuf), f);
+    //printf("databuf = %s\n",databuf);
+    memset(msg,'\0',sizeof(msg));
     
     while(strlen(package) != package_num_len)
       strncat(package, "-",sizeof(unsigned char));
     strncat(msg, package, strlen(package));
-    memset(len,'\0',package_num_len);
+    memset(len,'\0',sizeof(len));
     sprintf(len,"%d",numbyte);
     while(strlen(len) != package_num_len){
       strncat(len, "-",sizeof(unsigned char));
     }
     strncat(msg, len, strlen(len));
-    printf("len = %s\nmsg = %s\n",len,msg);
     strncat(msg, databuf, numbyte);
-  
     /*encode*/
     // simulation parameters   
-    unsigned int n = datalen + package_num_len + 1;
+    unsigned int n = sizeof(msg);
     // compute size of encoded message
     unsigned int k = fec_get_enc_msg_length(fs,n);
     //unsigned char msg_org[n];   // original data message
     unsigned char msg_enc[k];   // encoded/received data message
-    memset(msg_enc,'\0',datalen + package_num_len + package_num_len + 1);
+    memset(msg_enc,'\0',sizeof(msg_enc));
     // CREATE the fec object
     fec q = fec_create(fs,NULL);
     //fec_print(q);
@@ -123,6 +122,7 @@ int main (int argc, char *argv[ ])
     fec_encode(q, n, msg, msg_enc);
     // corrupt encoded message (flip bit)
     msg_enc[0] ^= 0x01;
+
     // DESTROY the fec object
     fec_destroy(q);
 
@@ -148,11 +148,11 @@ int main (int argc, char *argv[ ])
   */
   fclose(f);
   /*send file ending signal*/
-  memset(databuf,'\0',datalen);
+  memset(databuf,'\0',sizeof(databuf));
   strcat(databuf,end_signal);
   sendto(sd, databuf, end_len, 0, (struct sockaddr*)&groupSock, sizeof(groupSock));
   /*send number of package */
-  memset(databuf,'\0',datalen);
+  memset(databuf,'\0',sizeof(databuf));
   strcat(databuf,package);
   sendto(sd, databuf, package_num_len, 0, (struct sockaddr*)&groupSock, sizeof(groupSock));
   //printf("%s\n",databuf);

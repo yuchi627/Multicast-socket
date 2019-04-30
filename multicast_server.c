@@ -13,6 +13,7 @@
 #define file_name_len 100
 #define end_len 12
 #define package_num_len 15
+#define ip_len 16
 
 struct in_addr localInterface;
 struct sockaddr_in groupSock;
@@ -23,8 +24,11 @@ int main (int argc, char *argv[ ])
 {
   char end_signal[end_len] = "endOFtheFILE";
   char file[file_name_len];
+  char ip[ip_len];
+  memset(ip,'\0',ip_len);
+  strncat(ip,argv[1],strlen(argv[1]));
   memset(file,'\0',file_name_len);
-  strcat(file,argv[1]);
+  strcat(file,argv[2]);
 
   /* Create a datagram socket on which to send. */
   sd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -58,7 +62,7 @@ int main (int argc, char *argv[ ])
   /* Set local interface for outbound multicast datagrams. */
   /* The IP address specified must be associated with a local, */
   /* multicast capable interface. */
-  localInterface.s_addr = inet_addr("127.0.0.1");
+  localInterface.s_addr = inet_addr(ip);
   if(setsockopt(sd, IPPROTO_IP, IP_MULTICAST_IF, (char *)&localInterface, sizeof(localInterface)) < 0)
   {
     perror("Setting local interface error");
@@ -66,7 +70,6 @@ int main (int argc, char *argv[ ])
   }
   /* Send a message to the multicast group specified by the*/
   /* groupSock sockaddr structure. */
-  /*int datalen = 1024;*/
 
   FILE *f;
   f = fopen(file,"rb");
@@ -79,38 +82,39 @@ int main (int argc, char *argv[ ])
   int package_num = 0;
   unsigned char package[package_num_len];
   unsigned char databuf[datalen];
-  unsigned char msg[datalen + package_num_len + 1];
-  //unsigned char msg_enc[datalen + package_num_len + 1];       // encoded/received data message
+  unsigned char msg[datalen + package_num_len + package_num_len + 1];
+  unsigned char len[package_num_len];
+  fec_scheme fs = LIQUID_FEC_HAMMING74;   // error-correcting scheme
   while(!feof(f)){
     
     ++package_num;
     memset(package,'\0',package_num_len);
     sprintf(package,"%d",package_num);
     memset(databuf,'\0',datalen);
-    
     numbyte = fread(databuf, sizeof(unsigned char), sizeof(databuf), f);
-    memset(msg,'\0',datalen + package_num_len + 1);
-    //printf("\n\nsize of package = %ld\n\n",strlen(package));
+    
+    memset(msg,'\0',datalen + package_num_len + package_num_len + 1);
+    
+    while(strlen(package) != package_num_len)
+      strncat(package, "-",sizeof(unsigned char));
     strncat(msg, package, strlen(package));
-    fec_scheme fs = LIQUID_FEC_HAMMING74;   // error-correcting scheme
-    while(strlen(msg) != package_num_len)
-      strncat(msg, "-",sizeof(unsigned char));
+    memset(len,'\0',package_num_len);
+    sprintf(len,"%d",numbyte);
+    while(strlen(len) != package_num_len){
+      strncat(len, "-",sizeof(unsigned char));
+    }
+    strncat(msg, len, strlen(len));
+    printf("len = %s\nmsg = %s\n",len,msg);
     strncat(msg, databuf, numbyte);
-
+  
     /*encode*/
-    // simulation parameters
-    //unsigned int n = sizeof(msg); // original data length (bytes)
-
-    //unsigned int n = 8;       
-
-
-
+    // simulation parameters   
     unsigned int n = datalen + package_num_len + 1;
     // compute size of encoded message
     unsigned int k = fec_get_enc_msg_length(fs,n);
     //unsigned char msg_org[n];   // original data message
     unsigned char msg_enc[k];   // encoded/received data message
-    memset(msg_enc,'\0',datalen + package_num_len + 1);
+    memset(msg_enc,'\0',datalen + package_num_len + package_num_len + 1);
     // CREATE the fec object
     fec q = fec_create(fs,NULL);
     //fec_print(q);
@@ -128,12 +132,7 @@ int main (int argc, char *argv[ ])
     {
       perror("Sending datagram message error");
     }
-    else{
-      //printf("`````%d``````\n",numbyte + package_num_len);
-      //printf("Sendinf msg: %s OK\n",msg);
-    }
   }
-  //printf("what the fuck\n");
   /* Try the re-read from the socket if the loopback is not disable
   if(read(sd, databuf, datalen) < 0)
   {
@@ -155,11 +154,11 @@ int main (int argc, char *argv[ ])
   /*send number of package */
   memset(databuf,'\0',datalen);
   strcat(databuf,package);
-  while(strlen(databuf) != package_num_len)
-    strcat(databuf,"\n");
   sendto(sd, databuf, package_num_len, 0, (struct sockaddr*)&groupSock, sizeof(groupSock));
+  //printf("%s\n",databuf);
   close(sd);
   return 0;
 }
 
 //gcc -o server multicast_server.c -lliquid
+//./server 127.0.0.1 input.txt

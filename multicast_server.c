@@ -91,7 +91,6 @@ int main (int argc, char *argv[ ])
   unsigned int k = fec_get_enc_msg_length(fs,n);
   memset(encode_len,'\0',sizeof(encode_len));
   sprintf(encode_len,"%u",k);
-  printf("k= %u      en = %s",k,encode_len);
   if(sendto(sd, encode_len, sizeof(encode_len), 0, (struct sockaddr*)&groupSock, sizeof(groupSock)) < 0)
   {
     perror("Sending datagram message error");
@@ -99,7 +98,6 @@ int main (int argc, char *argv[ ])
 
   memset(encode_len2,'\0',sizeof(encode_len2));
   sprintf(encode_len2,"%u",n);
-  printf("n= %u      en = %s",n,encode_len2);
   if(sendto(sd, encode_len2, sizeof(encode_len2), 0, (struct sockaddr*)&groupSock, sizeof(groupSock)) < 0)
   {
     perror("Sending datagram message error");

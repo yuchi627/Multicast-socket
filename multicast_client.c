@@ -99,12 +99,10 @@ int main(int argc, char *argv[])
   memset(decode_len,'\0',sizeof(decode_len));
   read(sd, decode_len, sizeof(decode_len));
   int decode_len_num = atoi(decode_len);
-  printf("decode = %s, len = %d\n",decode_len, decode_len_num);
   char decode_len2[package_num_len];
   memset(decode_len2,'\0',sizeof(decode_len2));
   read(sd, decode_len2, sizeof(decode_len2));
   int decode_len_num2 = atoi(decode_len2);
-  printf("decode2 = %s, len2 = %d\n",decode_len2, decode_len_num2);
 
   int numbyte;
   int package_count=0 ;
